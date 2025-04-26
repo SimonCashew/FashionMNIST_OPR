@@ -1,0 +1,35 @@
+seed: 5678
+lr_start: 0.0003
+reg_factor: 0.001
+steps: 300
+wandb:
+  setup:
+    entity: simonb03-university-of-t-bingen
+sweep:
+  program: main.py
+  name: MNIST_normal
+  metric:
+    name: val_loss
+    goal: minimize
+  method: grid
+  parameters:
+    seed:
+      value: 5678
+    lr_start:
+      values:
+      - 0.005
+      - 0.001
+      - 0.0005
+      - 0.0001
+    reg_factor:
+      values:
+      - 0.005
+      - 0.001
+      - 0.0005
+      - 0.0001
+      - 5.0e-05
+    step:
+      value: 300
+  command:
+  - python
+  - main.py

@@ -1,0 +1,15 @@
+defaults:
+  - _self_
+  - sweep: sweep
+
+seed: 5678
+
+lr_start: 1e-3
+reg_factor: 1e-4
+
+steps: 900
+
+wandb:
+  setup:
+    entity: simonb03-university-of-t-bingen
+
