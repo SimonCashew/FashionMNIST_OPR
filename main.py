@@ -188,7 +188,5 @@ def main(cfg: DictConfig):
 
     model = train(model, trainloader, valloader, optim, STEPS, PRINT_EVERY)
 
-    wandb.finish()
-
 if __name__=='__main__':
     main()
