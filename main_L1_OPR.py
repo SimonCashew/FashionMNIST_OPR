@@ -1,9 +1,13 @@
+import os
+os.environ["JAX_PLATFORM_NAME"] = "cpu"
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optax  
 import torch  
 import torchvision  
+from torch.utils.data import Subset
 from jaxtyping import Array, Float, Int, PyTree
 
 import wandb
@@ -18,18 +22,13 @@ sys.path.append("../../orient/")
 
 @hydra.main(config_path="conf", config_name="config", version_base="1.3")
 def main(cfg: DictConfig):
-    cfg_container = omegaconf.OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    run = wandb.init(project="MNIST_L1_OPR", config=cfg_container)
-    cfg_dict = dict(wandb.config)
-    cfg = OmegaConf.create(cfg_dict)
-
     LEARNING_RATE = cfg.lr_start
     REG_FACTOR = cfg.reg_factor
     STEPS = cfg.steps
     SEED = cfg.seed
 
-    BATCH_SIZE = 64
-    PRINT_EVERY = 30
+    BATCH_SIZE = cfg.batch_size
+    PRINT_EVERY = 50
 
     key = jax.random.PRNGKey(SEED)
 
@@ -39,7 +38,7 @@ def main(cfg: DictConfig):
             torchvision.transforms.Normalize((0.5,), (0.5,)),
         ]
     )
-    train_dataset = torchvision.datasets.FashionMNIST(
+    full_train_dataset = torchvision.datasets.FashionMNIST(
         "FashionMNIST",
         train=True,
         download=True,
@@ -51,12 +50,17 @@ def main(cfg: DictConfig):
         download=True,
         transform=normalize_data,
     )
+    train_dataset = Subset(full_train_dataset, list(range(0, 55000)))
+    test_dataset = Subset(full_train_dataset, list(range(55000, 60000)))
     trainloader = torch.utils.data.DataLoader(
         train_dataset, batch_size=BATCH_SIZE, shuffle=False
     )
     valloader = torch.utils.data.DataLoader(
         val_dataset, batch_size=BATCH_SIZE, shuffle=False
     )
+    #valloader = torch.utils.data.DataLoader(
+        #test_dataset, batch_size=BATCH_SIZE, shuffle=False
+    #)
 
     class CNN(eqx.Module):
         layers: list
@@ -75,6 +79,26 @@ def main(cfg: DictConfig):
                 eqx.nn.Linear(64, 10, key=key4),
                 jax.nn.log_softmax,
             ]
+
+        '''def __init__(self, key):
+            key1, key2, key3, key4 = jax.random.split(key, 4)
+            self.layers = [
+                eqx.nn.Conv2d(1, 32, kernel_size=3, padding=1, key=key1),
+                jax.nn.relu,
+                eqx.nn.MaxPool2d(kernel_size=2, stride=2),
+
+                eqx.nn.Conv2d(32, 64, kernel_size=3, padding=1, key=key2),
+                jax.nn.relu,
+                eqx.nn.MaxPool2d(kernel_size=2, stride=2),
+
+                jnp.ravel,
+
+                eqx.nn.Linear(3136, 128, key=key3), 
+                jax.nn.relu,
+
+                eqx.nn.Linear(128, 10, key=key4),
+                jax.nn.log_softmax,
+            ]'''
 
         def __call__(self, x: Float[Array, "1 28 28"]) -> Float[Array, "10"]:
             for layer in self.layers:
@@ -99,7 +123,6 @@ def main(cfg: DictConfig):
     def l1(model: CNN):
         params, _ = eqx.partition(model, eqx.is_array)
         return sum(jnp.abs(w).mean() for w in jax.tree.leaves(params))
-        #return sum(jnp.sum(jnp.abs(p)) for p in jax.tree.leaves(params))
     
     def combine_gradients(loss_grad, l1_grad):
         loss_flat, spec = jax.tree_util.tree_flatten(loss_grad)
@@ -179,11 +202,13 @@ def main(cfg: DictConfig):
             x = x.numpy()
             y = y.numpy()
             model, opt_state, train_loss = make_step(model, opt_state, x, y)
-            run.log({"loss": train_loss}, step=step)
+            if (step % print_every) == 0:
+                print("step: ", step, ", loss: ", train_loss)
             if (step == steps - 1):
+                print("step: ", step, ", loss: ", train_loss)
                 val_loss, val_accuracy = evaluate(model, valloader)
-                run.log({"val_loss": val_loss}, step=step)
-                run.log({"val_accuracy": val_accuracy}, step=step)
+                print("validation loss: ", val_loss)
+                print("Accuracy: ", val_accuracy)
         return model
 
     model = train(model, trainloader, valloader, optim, STEPS, PRINT_EVERY)

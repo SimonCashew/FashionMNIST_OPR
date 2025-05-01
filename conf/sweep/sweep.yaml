@@ -1,9 +1,5 @@
-# Create sweep:
-# wandb sweep conf\sweep\sweep.yaml -e simonb03-university-of-t-bingen -p MNIST_normal
-
-
-program: main.py
-name: MNIST_normal
+program: main_L2.py
+name: MNIST_L2_sweep
 metric:
   name: val_loss
   goal: minimize
@@ -12,18 +8,23 @@ method: grid
 
 parameters:
   seed:
-    value: 5678
+    #value: 0
+    values: [0, 1]
+
+  steps:
+    value: 4000
+    #values: [1000, 2000, 5000, 10000]
+  batch_size:
+    value: 32
+    #values: [32, 64, 128]
 
   lr_start:
-    values: [0.005, 1e-3, 0.0005, 1e-4]
+    #value: 1e-3
+    values: [5e-3, 1e-3, 5e-4, 1e-4]
   reg_factor: 
-    values: [0.005, 1e-3, 0.0005, 1e-4, 0.00005]
-
-  step:
-    value: 300
+    #value: 1e-4
+    values: [1e-3, 5e-4, 1e-4, 5e-5]
 
 command:
-#  - C:/Users/Simon/.conda/envs/EQL/python.exe
   - python
-  - main.py
-# - wandb.setup.entity=simonb03-university-of-t-bingen
+  - main_L2.py
